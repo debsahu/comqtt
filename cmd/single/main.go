@@ -18,6 +18,7 @@ import (
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/config"
 	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/dashboard"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/badger"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/bolt"
@@ -135,7 +136,26 @@ func realMain(ctx context.Context) error {
 	onError(server.AddListener(ws), "add websocket listener")
 
 	// add http listener
-	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, rest.New(server).GenHandlers())
+	restHandlers := rest.New(server).GenHandlers()
+
+	dashCleanup := func() {}
+	if cfg.Dashboard.Enabled {
+		dashRoutes, cleanup, err := dashboard.Routes(dashboard.Options{
+			Server:             server,
+			Cluster:            false,
+			Secret:             cfg.Dashboard.DecodeSecret(),
+			PasswordExpiryDays: cfg.Dashboard.PasswordExpiryDays,
+		})
+		if err != nil {
+			return fmt.Errorf("dashboard routes: %w", err)
+		}
+		dashCleanup = cleanup
+		for path, h := range dashRoutes {
+			restHandlers[path] = h
+		}
+	}
+
+	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, restHandlers)
 	onError(server.AddListener(http), "add http listener")
 
 	errCh := make(chan error, 1)
@@ -155,6 +175,7 @@ func realMain(ctx context.Context) error {
 	case <-ctx.Done():
 		log.Warn("caught signal, stopping...")
 	}
+	dashCleanup()
 	server.Close()
 	log.Info("main.go finished")
 	return nil

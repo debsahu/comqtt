@@ -11,15 +11,23 @@ import (
 )
 
 const (
-	MqttGetOverallPath     = "/api/v1/mqtt/stat/overall"
-	MqttGetOnlinePath      = "/api/v1/mqtt/stat/online"
-	MqttGetClientPath      = "/api/v1/mqtt/clients/{id}"
-	MqttGetBlacklistPath   = "/api/v1/mqtt/blacklist"
-	MqttAddBlacklistPath   = "/api/v1/mqtt/blacklist/{id}"
-	MqttDelBlacklistPath   = "/api/v1/mqtt/blacklist/{id}"
-	MqttPublishMessagePath = "/api/v1/mqtt/message"
-	MqttGetConfigPath      = "/api/v1/mqtt/config"
-	PrometheusMetrics      = "/metrics"
+	MqttGetOverallPath        = "/api/v1/mqtt/stat/overall"
+	MqttGetOnlinePath         = "/api/v1/mqtt/stat/online"
+	MqttGetClientPath         = "/api/v1/mqtt/clients/{id}"
+	MqttListClientsPath       = "/api/v1/mqtt/clients"
+	MqttUnsubscribeClientPath = "/api/v1/mqtt/clients/{id}/subscriptions/{topic}"
+	MqttListSubscriptionsPath = "/api/v1/mqtt/subscriptions"
+	MqttTopicsTreePath        = "/api/v1/mqtt/topics"
+	MqttListRetainedPath      = "/api/v1/mqtt/retained"
+	MqttClearRetainedPath     = "/api/v1/mqtt/retained/{topic}"
+	MqttListSessionsPath      = "/api/v1/mqtt/sessions"
+	MqttClearSessionPath      = "/api/v1/mqtt/sessions/{id}"
+	MqttGetBlacklistPath      = "/api/v1/mqtt/blacklist"
+	MqttAddBlacklistPath      = "/api/v1/mqtt/blacklist/{id}"
+	MqttDelBlacklistPath      = "/api/v1/mqtt/blacklist/{id}"
+	MqttPublishMessagePath    = "/api/v1/mqtt/message"
+	MqttGetConfigPath         = "/api/v1/mqtt/config"
+	PrometheusMetrics         = "/metrics"
 )
 
 type Handler = func(http.ResponseWriter, *http.Request)
@@ -36,14 +44,22 @@ func New(server *mqtt.Server) *Rest {
 
 func (s *Rest) GenHandlers() map[string]Handler {
 	return map[string]Handler{
-		"GET " + MqttGetConfigPath:       s.viewConfig,
-		"GET " + MqttGetOverallPath:      s.getOverallInfo,
-		"GET " + MqttGetOnlinePath:       s.getOnlineCount,
-		"GET " + MqttGetClientPath:       s.getClient,
-		"GET " + MqttGetBlacklistPath:    s.blacklist,
-		"POST " + MqttAddBlacklistPath:   s.kickClient,
-		"DELETE " + MqttDelBlacklistPath: s.blanchClient,
-		"POST " + MqttPublishMessagePath: s.publishMessage,
+		"GET " + MqttGetConfigPath:         s.viewConfig,
+		"GET " + MqttGetOverallPath:        s.getOverallInfo,
+		"GET " + MqttGetOnlinePath:         s.getOnlineCount,
+		"GET " + MqttGetClientPath:         s.getClient,
+		"GET " + MqttListClientsPath:       s.listClients,
+		"GET " + MqttListSubscriptionsPath: s.listSubscriptions,
+		"GET " + MqttTopicsTreePath:        s.topicsTree,
+		"GET " + MqttListRetainedPath:      s.listRetained,
+		"DELETE " + MqttClearRetainedPath:  s.clearRetained,
+		"GET " + MqttListSessionsPath:      s.listSessions,
+		"DELETE " + MqttClearSessionPath:   s.clearSession,
+		"GET " + MqttGetBlacklistPath:      s.blacklist,
+		"POST " + MqttAddBlacklistPath:     s.kickClient,
+		"DELETE " + MqttDelBlacklistPath:   s.blanchClient,
+		"DELETE " + MqttUnsubscribeClientPath: s.unsubscribeClient,
+		"POST " + MqttPublishMessagePath:   s.publishMessage,
 		"GET " + PrometheusMetrics: promhttp.HandlerFor(
 			s.server.Options.PrometheusRegistry,
 			promhttp.HandlerOpts{

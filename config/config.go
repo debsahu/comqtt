@@ -10,6 +10,7 @@ import (
 	tls2 "crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"math/big"
@@ -67,7 +68,9 @@ var (
 )
 
 func New() *Config {
-	return &Config{}
+	return &Config{
+		Dashboard: Dashboard{Enabled: true},
+	}
 }
 
 func Load(yamlFile string) (*Config, error) {
@@ -79,7 +82,9 @@ func Load(yamlFile string) (*Config, error) {
 }
 
 func parse(buf []byte) (*Config, error) {
-	conf := &Config{}
+	// Pre-populate defaults so omitted YAML keys keep them. yaml.v3
+	// overwrites only the fields that are present in the document.
+	conf := New()
 	err := yaml.Unmarshal(buf, conf)
 	if err != nil {
 		return nil, err
@@ -97,7 +102,31 @@ type Config struct {
 	Cluster     Cluster     `yaml:"cluster"`
 	Redis       redis       `yaml:"redis"`
 	Log         log.Options `yaml:"log"`
+	Dashboard   Dashboard   `yaml:"dashboard"`
 	PprofEnable bool        `yaml:"pprof-enable"`
+}
+
+// Dashboard holds the v1 web-dashboard wiring choices. Defaults are applied
+// in mqtt/dashboard.Options.applyDefaults; these YAML fields let operators
+// opt out (Enabled=false), pin a session secret across restarts, or change
+// the password expiry policy without code changes.
+type Dashboard struct {
+	Enabled            bool   `yaml:"enabled"`
+	SessionSecret      string `yaml:"session-secret"`
+	PasswordExpiryDays int    `yaml:"password-expiry-days"`
+}
+
+// DecodeSecret returns the SessionSecret as raw bytes. It accepts either a
+// base64-encoded string or a raw secret. Returns nil if SessionSecret is
+// empty (in which case the dashboard auto-generates and persists one).
+func (d *Dashboard) DecodeSecret() []byte {
+	if d.SessionSecret == "" {
+		return nil
+	}
+	if b, err := base64.StdEncoding.DecodeString(d.SessionSecret); err == nil && len(b) >= 16 {
+		return b
+	}
+	return []byte(d.SessionSecret)
 }
 
 type auth struct {
